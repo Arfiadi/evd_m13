@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Penjualan dengan D3.js</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+/* CSS Global */
+body {
+    background-color: #f4f7f6;
+    font-family: Arial, sans-serif;
+}
+
+/* CSS Pembungkus Utama */
+.dashboard-wrapper {
+    max-width: 1030px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+/* CSS Kontainer KPI */
+.kpi-container {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 30px;
+}
+
+/* 1. CSS Kotak KPI (DIUBAH) */
+.kpi-box {
+    flex: 1;
+    padding: 20px;
+    background-color: #f9f9f9; /* Kembalikan warna abu-abu */
+    border: 1px solid #e0e0e0; /* Kembalikan border */
+    border-radius: 8px;
+    text-align: center;
+    font-family: Arial, sans-serif;
+    box-sizing: border-box;
+    /* Hapus color: #ffffff */
+}
+
+/* 2. CSS Judul KPI (DIUBAH) */
+.kpi-box-title {
+    font-size: 16px; /* Sedikit diperbesar */
+    color: #666;
+    font-weight: 600; /* Sedikit tebal */
+}
+
+/* 3. CSS Nilai KPI (DIUBAH) */
+.kpi-box-value {
+    font-size: 36px; /* Diperbesar dari 28px */
+    font-weight: bold;
+    color: #333;
+    margin-top: 5px;
+}
+
+
+
+
+/* Kontainer Grafik */
+.chart-container {
+display: flex;
+flex-wrap: wrap;
+gap: 30px;
+justify-content: center;
+}
+
+/* CSS Grafik Individual */
+.chart {
+width: 500px;
+height: 400px;
+border: 1px solid #e0e0e0;
+border-radius: 8px;
+box-sizing: border-box;
+}
+
+/* CSS Lainnya (Tidak berubah) */
+.chart svg {
+width: 100%;
+height: 100%;
+}
+.chart h3 {
+text-align: center;
+margin: 10px 0 0 0;
+font-family: Arial, sans-serif;
+font-size: 1.1em;
+}
+.tooltip {
+position: absolute;
+background-color: #fff;
+border: 1px solid #ccc;
+padding: 8px;
+font-size: 12px;
+pointer-events: none;
+display: none;
+opacity: 0.9;
+border-radius: 3px;
+}
+.legend-text {
+    font-size: 12px;
+    font-family: Arial, sans-serif;
+}
+h1 {
+    text-align: center;
+    font-family: Arial, sans-serif;
+}
+.kpi-title {
+    font-size: 16px;
+    font-family: Arial, sans-serif;
+    fill: #666;
+    text-anchor: middle;
+}
+.kpi-value {
+    font-size: 32px;
+    font-weight: bold;
+    font-family: Arial, sans-serif;
+    fill: #333;
+    text-anchor: middle;
+}
+</style>
+</head>
+<body>
+
+<div class="dashboard-wrapper">
+    <h1>Dashboard Penjualan</h1>
+
+    <div class="kpi-container">
+        <div class="kpi-box"> <div class="kpi-box-title">Total Transaksi</div>
+            <div class="kpi-box-value" id="kpi-total-transaksi">...</div>
+        </div>
+        <div class="kpi-box"> <div class="kpi-box-title">Rata-rata Unit per Transaksi</div>
+            <div class="kpi-box-value" id="kpi-avg-units">...</div>
+        </div>
+    </div>
+
+    <div class="chart-container">
+    <div id="pieChart" class="chart">
+        <h3>Total Penjualan per Produk</h3>
+    </div>
+    <div id="barChart" class="chart">
+        <h3>Total Penjualan per Produk</h3>
+    </div>
+    <div id="lineChart" class="chart">
+        <h3>Tren Penjualan Harian</h3>
+    </div>
+    <div id="scatterPlot" class="chart">
+        <h3>Jumlah Penjualan vs Tanggal</h3>
+    </div>
+    </div>
+
+</div> <div class="tooltip" id="tooltip"></div>
+
+<script>
+// SCRIPT (Tidak ada perubahan sama sekali)
+const tooltip = d3.select("#tooltip");
+fetch('konekdata.php')
+.then(response => response.json())
+.then(data => {
+    data.forEach(d => {
+        d.sales_amount = +d.sales_amount;
+        d.transaction_date = new Date(d.transaction_date);
+    });
+    const groupedData = d3.rollups(
+        data,
+        v => d3.sum(v, d => d.sales_amount),
+        d => d.product_name
+    );
+    const totalSales = d3.sum(groupedData, d => d[1]);
+    const totalTransactions = data.length;
+    const avgUnits = (totalSales / totalTransactions).toFixed(1);
+    d3.select("#kpi-total-transaksi").text(totalTransactions);
+    d3.select("#kpi-avg-units").text(avgUnits);
+    const pieMargin = {top: 0, right: 20, bottom: 20, left: 20};
+    const pieWidth = 500 - pieMargin.left - pieMargin.right;
+    const pieHeight = 350 - pieMargin.top - pieMargin.bottom;
+    const radius = 130; 
+    const pieColor = d3.scaleOrdinal(d3.schemeCategory10)
+        .domain(groupedData.map(d => d[0]));
+    const pieSvgContainer = d3.select("#pieChart").append("svg")
+        .attr("width", pieWidth + pieMargin.left + pieMargin.right)
+        .attr("height", pieHeight + pieMargin.top + pieMargin.bottom);
+    const pieSvg = pieSvgContainer.append("g")
+        .attr("transform", `translate(190, ${pieHeight / 2 + pieMargin.top})`); 
+    const pie = d3.pie().value(d => d[1]);
+    const arc = d3.arc()
+        .innerRadius(radius * 0.6)
+        .outerRadius(radius);
+    const labelArc = d3.arc().outerRadius(radius * 0.8).innerRadius(radius * 0.8);
+    pieSvg.selectAll("path")
+        .data(pie(groupedData))
+        .enter()
+        .append("path")
+        .attr("d", arc)
+        .attr("fill", d => pieColor(d.data[0])) 
+        .on("mouseover", (event, d) => {
+            const percent = ((d.data[1] / totalSales) * 100).toFixed(1);
+            tooltip.style("display", "block")
+            .html(`
+                <strong>Produk:</strong> ${d.data[0]}<br>
+                <strong>Jumlah:</strong> ${d.data[1]}<br>
+                <strong>Persentase:</strong> ${percent}%
+            `);
+        })
+        .on("mousemove", (event) => {
+            tooltip.style("left", (event.pageX + 10) + "px")
+                   .style("top", (event.pageY - 10) + "px");
+        })
+        .on("mouseout", () => {
+            tooltip.style("display", "none");
+        });
+    pieSvg.selectAll("text.label-persen")
+        .data(pie(groupedData))
+        .enter()
+        .append("text")
+        .attr("class", "label-persen")
+        .attr("transform", d => `translate(${labelArc.centroid(d)})`)
+        .attr("dy", "0.35em")
+        .style("text-anchor", "middle")
+        .style("font-size", "12px")
+        .style("fill", "white")
+        .text(d => `${((d.data[1] / totalSales) * 100).toFixed(1)}%`);
+    pieSvg.append("text")
+        .attr("class", "kpi-title")
+        .attr("dy", "-0.5em")
+        .text("Total Penjualan");
+    pieSvg.append("text")
+        .attr("class", "kpi-value")
+        .attr("dy", "0.6em")
+        .text(totalSales);
+    const legend = pieSvgContainer.append("g")
+        .attr("transform", `translate(340, 50)`);
+    const legendItems = legend.selectAll(".legend-item")
+        .data(groupedData)
+        .enter()
+        .append("g")
+        .attr("class", "legend-item")
+        .attr("transform", (d, i) => `translate(0, ${i * 25})`);
+    legendItems.append("rect")
+        .attr("width", 15)
+        .attr("height", 15)
+        .attr("fill", d => pieColor(d[0]));
+    legendItems.append("text")
+        .attr("class", "legend-text")
+        .attr("x", 20)
+        .attr("y", 12) 
+        .text(d => d[0]); 
+    const barMargin = {top: 10, right: 20, bottom: 40, left: 40};
+    const barWidth = 500 - barMargin.left - barMargin.right;
+    const barHeight = 350 - barMargin.top - barMargin.bottom;
+    const barSvg = d3.select("#barChart").append("svg")
+        .attr("width", barWidth + barMargin.left + barMargin.right)
+        .attr("height", barHeight + barMargin.top + barMargin.bottom)
+        .append("g")
+        .attr("transform", `translate(${barMargin.left},${barMargin.top})`);
+    const xBar = d3.scaleBand()
+        .domain(groupedData.map(d => d[0]))
+        .range([0, barWidth])
+        .padding(0.1);
+    const yBar = d3.scaleLinear()
+        .domain([0, d3.max(groupedData, d => d[1])]).nice()
+        .range([barHeight, 0]);
+    barSvg.append("g")
+        .attr("transform", `translate(0,${barHeight})`)
+        .call(d3.axisBottom(xBar));
+    barSvg.append("g")
+        .call(d3.axisLeft(yBar));
+    barSvg.selectAll("rect")
+        .data(groupedData)
+        .enter()
+        .append("rect")
+        .attr("x", d => xBar(d[0]))
+        .attr("y", d => yBar(d[1]))
+        .attr("width", xBar.bandwidth())
+        .attr("height", d => barHeight - yBar(d[1]))
+        .attr("fill", d => pieColor(d[0]))
+        .on("mouseover", (event, d) => {
+            tooltip.style("display", "block")
+            .html(`
+                <strong>Produk:</strong> ${d[0]}<br>
+                <strong>Jumlah:</strong> ${d[1]}
+            `);
+        })
+        .on("mousemove", (event) => {
+            tooltip.style("left", (event.pageX + 10) + "px")
+                   .style("top", (event.pageY - 10) + "px");
+        })
+        .on("mouseout", () => {
+            tooltip.style("display", "none");
+        });
+    const lineMargin = {top: 10, right: 20, bottom: 40, left: 40};
+    const lineWidth = 500 - lineMargin.left - lineMargin.right;
+    const lineHeight = 350 - lineMargin.top - lineMargin.bottom;
+    const lineSvg = d3.select("#lineChart").append("svg")
+        .attr("width", lineWidth + lineMargin.left + lineMargin.right)
+        .attr("height", lineHeight + lineMargin.top + lineMargin.bottom)
+        .append("g")
+        .attr("transform", `translate(${lineMargin.left},${lineMargin.top})`);
+    const xLine = d3.scaleTime()
+        .domain(d3.extent(data, d => d.transaction_date))
+        .range([0, lineWidth]);
+    const yLine = d3.scaleLinear()
+        .domain([0, d3.max(data, d => d.sales_amount)]).nice()
+        .range([lineHeight, 0]);
+    lineSvg.append("g")
+        .attr("transform", `translate(0,${lineHeight})`)
+        .call(d3.axisBottom(xLine).ticks(7));
+    lineSvg.append("g")
+        .call(d3.axisLeft(yLine));
+    const line = d3.line()
+        .x(d => xLine(d.transaction_date))
+        .y(d => yLine(d.sales_amount));
+    lineSvg.append("path")
+        .datum(data)
+        .attr("fill", "none")
+        .attr("stroke", "blue")
+        .attr("stroke-width", 1.5)
+        .attr("d", line);
+    const scatterMargin = {top: 10, right: 100, bottom: 40, left: 40};
+    const scatterWidth = 500 - scatterMargin.left - scatterMargin.right;
+    const scatterHeight = 350 - scatterMargin.top - scatterMargin.bottom;
+    const scatterSvgContainer = d3.select("#scatterPlot").append("svg")
+        .attr("width", scatterWidth + scatterMargin.left + scatterMargin.right)
+        .attr("height", scatterHeight + scatterMargin.top + scatterMargin.bottom);
+    const scatterSvg = scatterSvgContainer.append("g")
+        .attr("transform", `translate(${scatterMargin.left},${scatterMargin.top})`);
+    const xScatter = d3.scaleTime()
+        .domain(d3.extent(data, d => d.transaction_date))
+        .range([0, scatterWidth]);
+    const yScatter = d3.scaleLinear()
+        .domain([0, d3.max(data, d => d.sales_amount)]).nice()
+        .range([scatterHeight, 0]);
+    scatterSvg.append("g")
+        .attr("transform", `translate(0,${scatterHeight})`)
+        .call(d3.axisBottom(xScatter).ticks(5));
+    scatterSvg.append("g")
+        .call(d3.axisLeft(yScatter));
+    scatterSvg.selectAll("circle")
+        .data(data)
+        .enter()
+        .append("circle")
+        .attr("cx", d => xScatter(d.transaction_date))
+        .attr("cy", d => yScatter(d.sales_amount))
+        .attr("r", 5)
+        .attr("fill", d => pieColor(d.product_name))
+        .style("opacity", 0.7)
+        .on("mouseover", (event, d) => {
+            tooltip.style("display", "block")
+            .html(`
+                <strong>Produk:</strong> ${d.product_name}<br>
+                <strong>Jumlah:</strong> ${d.sales_amount}<br>
+                <strong>Tanggal:</strong> ${d.transaction_date.toLocaleDateString()}
+            `);
+        })
+        .on("mousemove", (event) => {
+            tooltip.style("left", (event.pageX + 10) + "px")
+                   .style("top", (event.pageY - 10) + "px");
+        })
+        .on("mouseout", () => {
+            tooltip.style("display", "none");
+        });
+    const scatterLegend = scatterSvgContainer.append("g")
+        .attr("transform", `translate(${scatterMargin.left + scatterWidth + 10}, ${scatterMargin.top})`); 
+    const scatterLegendItems = scatterLegend.selectAll(".legend-item")
+        .data(groupedData)
+        .enter()
+        .append("g")
+        .attr("class", "legend-item")
+        .attr("transform", (d, i) => `translate(0, ${i * 25})`);
+    scatterLegendItems.append("rect")
+        .attr("width", 15)
+        .attr("height", 15)
+        .attr("fill", d => pieColor(d[0]));
+    scatterLegendItems.append("text")
+        .attr("class", "legend-text")
+        .attr("x", 20)
+        .attr("y", 12) 
+        .text(d => d[0]);
+})
+.catch(error => console.error('Error:', error));
+</script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grafik Batang D3.js dari CSV</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+.bar {
+fill: steelblue;
+}
+.bar:hover {
+fill: orange;
+}
+.axis--x path,
+.axis--x line {
+display: none;
+}
+
+/* 1. CSS untuk Judul (BARU) */
+h1 {
+    font-family: Arial, sans-serif;
+}
+
+/* 2. CSS untuk Tooltip (BARU) */
+.tooltip {
+    position: absolute;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    padding: 8px;
+    font-size: 12px;
+    pointer-events: none;
+    display: none;
+}
+</style>
+</head>
+<body>
+
+<h1>Grafik Batang dari Data CSV</h1>
+
+<div class="tooltip" id="tooltip"></div>
+
+<svg width="600" height="400"></svg>
+<script>
+// 5. Seleksi Tooltip (BARU)
+const tooltip = d3.select("#tooltip");
+
+d3.json('datacsv.php').then(data => {
+const svg = d3.select('svg');
+const margin = {top: 20, right: 30, bottom: 40, left: 40};
+const width = +svg.attr('width') - margin.left - margin.right;
+const height = +svg.attr('height') - margin.top - margin.bottom;
+const x = d3.scaleBand()
+.domain(data.map(d => d.label))
+.range([margin.left, width - margin.right])
+.padding(0.1);
+const y = d3.scaleLinear()
+.domain([0, d3.max(data, d => d.nilai)]).nice()
+.range([height - margin.bottom, margin.top]);
+svg.append('g')
+.attr('transform', `translate(0,${height - margin.bottom})`)
+.call(d3.axisBottom(x));
+svg.append('g')
+.attr('transform', `translate(${margin.left},0)`)
+.call(d3.axisLeft(y));
+svg.append('g')
+.selectAll('.bar')
+.data(data)
+.enter().append('rect')
+.attr('class', 'bar')
+.attr('x', d => x(d.label))
+.attr('y', d => y(d.nilai))
+.attr('height', d => y(0) - y(d.nilai))
+.attr('width', x.bandwidth())
+// 6. Tambahkan Event Tooltip (BARU)
+.on("mouseover", (event, d) => {
+    tooltip.style("display", "block")
+    .html(`
+        <strong>Label:</strong> ${d.label}<br>
+        <strong>Nilai:</strong> ${d.nilai}
+    `);
+})
+.on("mousemove", (event) => {
+    tooltip.style("left", (event.pageX + 10) + "px")
+           .style("top", (event.pageY - 10) + "px");
+})
+.on("mouseout", () => {
+    tooltip.style("display", "none");
+});
+
+}).catch(error => {
+console.error('Error fetching data: ', error);
+});
+</script>
+</body>
+</html>

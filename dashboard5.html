@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grafik Lingkaran Penjualan dengan D3.js</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+.chart {
+display: flex;
+justify-content: center;
+align-items: center;
+width: 800px;
+height: 500px;
+}
+.tooltip {
+position: absolute;
+background-color: #fff;
+border: 1px solid #ccc;
+padding: 8px;
+font-size: 12px;
+pointer-events: none;
+display: none;
+}
+</style>
+</head>
+<body>
+<h1>Grafik Lingkaran Penjualan</h1>
+<div class="chart" id="pieChart"></div>
+<div class="tooltip" id="tooltip"></div>
+<script>
+// Mengambil data dari PHP
+fetch('konekpenjualan2.php')
+.then(response => response.json())
+.then(data => {
+// Mengkonversi nilai total_sales ke angka
+data.forEach(d => {
+d.total_sales = +d.total_sales;
+});
+const width = 400;
+const height = 400;
+const radius = Math.min(width, height) / 2;
+// Menambahkan SVG untuk grafik lingkaran
+const svg = d3.select("#pieChart")
+.append("svg")
+.attr("width", width)
+.attr("height", height)
+.append("g")
+.attr("transform", `translate(${width / 2},${height / 2})`);
+// Warna untuk setiap bagian pie chart
+const color = d3.scaleOrdinal(d3.schemeCategory10);
+// Membuat data untuk pie chart
+const pie = d3.pie()
+.value(d => d.total_sales);
+const arc = d3.arc()
+.innerRadius(0) // Radius dalam, untuk pie chart biasa
+.outerRadius(radius);
+// Tooltip
+const tooltip = d3.select("#tooltip");
+// Membuat bagian pie chart
+svg.selectAll("path")
+.data(pie(data))
+.enter()
+.append("path")
+.attr("d", arc)
+.attr("fill", d => color(d.data.product_name))
+.attr("stroke", "#fff")
+.style("stroke-width", "2px")
+.on("mouseover", (event, d) => {
+tooltip.style("display", "block")
+.html(`
+<strong>Produk:</strong> ${d.data.product_name}<br>
+<strong>Total Penjualan:</strong> ${d.data.total_sales}
+`);
+})
+.on("mousemove", (event) => {
+tooltip.style("left", (event.pageX + 10) + "px")
+.style("top", (event.pageY - 10) + "px");
+})
+.on("mouseout", () => {
+tooltip.style("display", "none");
+});
+// Menambahkan label pada setiap bagian
+svg.selectAll("text")
+.data(pie(data))
+.enter()
+.append("text")
+.text(d => d.data.product_name)
+.attr("transform", d => `translate(${arc.centroid(d)})`)
+.style("text-anchor", "middle")
+.style("font-size", "12px")
+.style("fill", "#fff");
+})
+.catch(error => console.error('Error:', error));
+</script>
+</body>
+</html>

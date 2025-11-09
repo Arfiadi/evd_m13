@@ -1,0 +1,118 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grafik Batang Penjualan dengan D3.js</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        .chart {
+            width: 800px;
+            height: 500px;
+        }
+        .axis-label {
+            font-size: 12px;
+        }
+        .tooltip {
+            position: absolute;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 8px;
+            font-size: 12px;
+            pointer-events: none;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Grafik Batang Penjualan</h1>
+    <div class="chart" id="barChart"></div>
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        // Mengambil data dari PHP
+        fetch('konekpenjualan2.php')
+            .then(response => response.json())
+            .then(data => {
+                // Mengkonversi nilai sales_amount ke angka
+                data.forEach(d => {
+                    d.total_sales = +d.total_sales;
+                });
+
+                const margin = { top: 20, right: 30, bottom: 50, left: 60 };
+                const width = 800 - margin.left - margin.right;
+                const height = 500 - margin.top - margin.bottom;
+
+                // Menambahkan SVG untuk grafik batang
+                const svg = d3.select("#barChart")
+                    .append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+                // Skala untuk sumbu X (Nama Produk)
+                const x = d3.scaleBand()
+                    .domain(data.map(d => d.product_name))
+                    .range([0, width])
+                    .padding(0.1);
+
+                // Skala untuk sumbu Y (Total Penjualan)
+                const y = d3.scaleLinear()
+                    .domain([0, d3.max(data, d => d.total_sales)])
+                    .nice()
+                    .range([height, 0]);
+
+                // Menambahkan sumbu X
+                svg.append("g")
+                    .attr("transform", `translate(0,${height})`)
+                    .call(d3.axisBottom(x))
+                    .selectAll("text")
+                    .attr("transform", "rotate(-45)")
+                    .style("text-anchor", "end");
+
+                // Menambahkan sumbu Y
+                svg.append("g")
+                    .call(d3.axisLeft(y))
+                    .append("text")
+                    .attr("class", "axis-label")
+                    .attr("x", -height / 2)
+                    .attr("y", -40)
+                    .attr("transform", "rotate(-90)")
+                    .attr("fill", "black")
+                    .style("text-anchor", "middle")
+                    .text("Total Penjualan");
+
+                // Tooltip
+                const tooltip = d3.select("#tooltip");
+
+                // Menambahkan batang ke grafik
+                svg.selectAll(".bar")
+                    .data(data)
+                    .enter()
+                    .append("rect")
+                    .attr("class", "bar")
+                    .attr("x", d => x(d.product_name))
+                    .attr("y", d => y(d.total_sales))
+                    .attr("width", x.bandwidth())
+                    .attr("height", d => height - y(d.total_sales))
+                    .attr("fill", "steelblue")
+                    .on("mouseover", (event, d) => {
+                        tooltip.style("display", "block")
+                            .html(`
+                                <strong>Produk:</strong> ${d.product_name}<br>
+                                <strong>Total Penjualan:</strong> ${d.total_sales}
+                            `);
+                    })
+                    .on("mousemove", (event) => {
+                        tooltip.style("left", (event.pageX + 10) + "px")
+                            .style("top", (event.pageY - 10) + "px");
+                    })
+                    .on("mouseout", () => {
+                        tooltip.style("display", "none");
+                    });
+            })
+            .catch(error => console.error('Error:', error));
+    </script>
+</body>
+</html>
+

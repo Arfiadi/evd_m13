@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Penjualan dengan D3.js</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+.chart-container {
+display: flex;
+flex-wrap: wrap;
+gap: 20px;
+}
+.chart {
+width: 400px;
+height: 400px;
+}
+.chart svg {
+width: 100%;
+height: 100%;
+}
+
+/* 1. CSS UNTUK TOOLTIP (BARU) */
+.tooltip {
+position: absolute;
+background-color: #fff;
+border: 1px solid #ccc;
+padding: 8px;
+font-size: 12px;
+pointer-events: none;
+display: none; /* Sembunyi secara default */
+opacity: 0.9;
+}
+</style>
+</head>
+<body>
+<h1>Dashboard Penjualan</h1>
+<div class="chart-container">
+<div id="pieChart" class="chart"></div>
+<div id="barChart" class="chart"></div>
+<div id="lineChart" class="chart"></div> 
+<div id="scatterPlot" class="chart"></div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// 3. Seleksi Tooltip (BARU)
+const tooltip = d3.select("#tooltip");
+
+// Mengambil data dari PHP
+fetch('konekdata.php')
+.then(response => response.json())
+.then(data => {
+// Data yang akan digunakan
+const groupedData = d3.rollups(
+data,
+v => d3.sum(v, d => d.sales_amount),
+d => d.product_name
+);
+const datesData = d3.group(data, d => d.transaction_date);
+
+// 4. Hitung Total Sales untuk persentase (BARU)
+const totalSales = d3.sum(groupedData, d => d[1]);
+
+// ########## GRAFIK LINGKARAN (PIE CHART) - DITINGKATKAN ##########
+const pieWidth = 400, pieHeight = 400, radius = Math.min(pieWidth, pieHeight) / 2;
+const pieSvg = d3.select("#pieChart").append("svg")
+.attr("width", pieWidth)
+.attr("height", pieHeight)
+.append("g")
+.attr("transform", `translate(${pieWidth / 2},${pieHeight / 2})`);
+
+const pieColor = d3.scaleOrdinal(d3.schemeCategory10);
+const pie = d3.pie().value(d => d[1]);
+const arc = d3.arc().outerRadius(radius).innerRadius(0);
+
+// 5. Arc untuk Label (BARU)
+const labelArc = d3.arc().outerRadius(radius * 0.7).innerRadius(radius * 0.7);
+
+pieSvg.selectAll("path")
+.data(pie(groupedData))
+.enter()
+.append("path")
+.attr("d", arc)
+.attr("fill", (d, i) => pieColor(i))
+// 6. Event Tooltip untuk Pie Chart (BARU)
+.on("mouseover", (event, d) => {
+    const percent = ((d.data[1] / totalSales) * 100).toFixed(1);
+    tooltip.style("display", "block")
+    .html(`
+        <strong>Produk:</strong> ${d.data[0]}<br>
+        <strong>Jumlah:</strong> ${d.data[1]}<br>
+        <strong>Persentase:</strong> ${percent}%
+    `);
+})
+.on("mousemove", (event) => {
+    tooltip.style("left", (event.pageX + 10) + "px")
+    .style("top", (event.pageY - 10) + "px");
+})
+.on("mouseout", () => {
+    tooltip.style("display", "none");
+});
+
+// 7. Tambahkan Label Persentase (BARU)
+pieSvg.selectAll("text")
+.data(pie(groupedData))
+.enter()
+.append("text")
+.attr("transform", d => `translate(${labelArc.centroid(d)})`)
+.attr("dy", "0.35em")
+.style("text-anchor", "middle")
+.style("font-size", "12px")
+.style("fill", "white")
+.text(d => `${((d.data[1] / totalSales) * 100).toFixed(1)}%`);
+
+
+// ########## GRAFIK BATANG (BAR CHART) - DIPERBAIKI & DITINGKATKAN ##########
+// 8. Tambahkan Margin
+const barMargin = {top: 20, right: 20, bottom: 40, left: 40};
+const barWidth = 400 - barMargin.left - barMargin.right;
+const barHeight = 400 - barMargin.top - barMargin.bottom;
+
+const barSvg = d3.select("#barChart").append("svg")
+.attr("width", barWidth + barMargin.left + barMargin.right)
+.attr("height", barHeight + barMargin.top + barMargin.bottom)
+.append("g")
+.attr("transform", `translate(${barMargin.left},${barMargin.top})`);
+
+// 9. Sesuaikan Skala
+const xBar = d3.scaleBand()
+.domain(groupedData.map(d => d[0]))
+.range([0, barWidth])
+.padding(0.1);
+
+const yBar = d3.scaleLinear()
+.domain([0, d3.max(groupedData, d => d[1])]).nice()
+.range([barHeight, 0]);
+
+// 10. GAMBAR SUMBU X (Perbaikan)
+barSvg.append("g")
+.attr("transform", `translate(0,${barHeight})`)
+.call(d3.axisBottom(xBar));
+
+// 11. GAMBAR SUMBU Y (Perbaikan)
+barSvg.append("g")
+.call(d3.axisLeft(yBar));
+
+// 12. Gambar Batang (Rectangles) + Tooltip
+barSvg.selectAll("rect")
+.data(groupedData)
+.enter()
+.append("rect")
+.attr("x", d => xBar(d[0]))
+.attr("y", d => yBar(d[1]))
+.attr("width", xBar.bandwidth())
+.attr("height", d => barHeight - yBar(d[1]))
+.attr("fill", "steelblue")
+// 13. Event Tooltip untuk Bar Chart (BARU)
+.on("mouseover", (event, d) => {
+    tooltip.style("display", "block")
+    .html(`
+        <strong>Produk:</strong> ${d[0]}<br>
+        <strong>Jumlah:</strong> ${d[1]}
+    `);
+})
+.on("mousemove", (event) => {
+    tooltip.style("left", (event.pageX + 10) + "px")
+    .style("top", (event.pageY - 10) + "px");
+})
+.on("mouseout", () => {
+    tooltip.style("display", "none");
+});
+
+})
+.catch(error => console.error('Error:', error));
+</script>
+</body>
+</html>

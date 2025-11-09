@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Penjualan dengan D3.js</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+.chart-container {
+display: flex;
+flex-wrap: wrap;
+gap: 20px;
+}
+.chart {
+width: 500px;
+height: 400px;
+}
+.chart svg {
+width: 100%;
+height: 100%;
+}
+</style>
+</head>
+<body>
+<h1>Dashboard Penjualan</h1>
+<div class="chart-container">
+<div id="pieChart" class="chart"></div>
+<div id="barChart" class="chart"></div>
+<div id="lineChart" class="chart"></div>
+<div id="scatterPlot" class="chart"></div>
+</div>
+<script>
+// Mengambil data dari PHP
+fetch('konekdata.php')
+.then(response => response.json())
+.then(data => {
+// Data yang akan digunakan
+const groupedData = d3.rollups(
+data,
+v => d3.sum(v, d => d.sales_amount),
+d => d.product_name
+);
+const datesData = d3.group(data, d => d.transaction_date);
+// Grafik Lingkaran (Pie Chart)
+const pieWidth = 200, pieHeight = 200, radius = Math.min(pieWidth, pieHeight) / 2;
+const pieSvg = d3.select("#pieChart").append("svg")
+.attr("width", pieWidth)
+.attr("height", pieHeight)
+.append("g")
+.attr("transform", `translate(${pieWidth / 2},${pieHeight / 2})`);
+
+const pieColor = d3.scaleOrdinal(d3.schemeCategory10);
+const pie = d3.pie().value(d => d[1]);
+const arc = d3.arc().outerRadius(radius).innerRadius(0);
+
+pieSvg.selectAll("path")
+.data(pie(groupedData))
+.enter()
+.append("path")
+.attr("d", arc)
+.attr("fill", (d, i) => pieColor(i));
+// Grafik Batang (Bar Chart)
+const barWidth = 200, barHeight = 200;
+const barSvg = d3.select("#barChart").append("svg")
+.attr("width", barWidth)
+.attr("height", barHeight);
+
+const xBar = d3.scaleBand()
+.domain(groupedData.map(d => d[0]))
+.range([0, barWidth])
+.padding(0.1);
+
+const yBar = d3.scaleLinear()
+.domain([0, d3.max(groupedData, d => d[1])])
+.range([barHeight, 0]);
+
+barSvg.selectAll("rect")
+.data(groupedData)
+.enter()
+.append("rect")
+.attr("x", d => xBar(d[0]))
+.attr("y", d => yBar(d[1]))
+.attr("width", xBar.bandwidth())
+.attr("height", d => barHeight - yBar(d[1]))
+.attr("fill", "steelblue");
+// Grafik Garis (Line Chart)
+const lineWidth = 200, lineHeight = 200;
+const lineSvg = d3.select("#lineChart").append("svg")
+.attr("width", lineWidth)
+.attr("height", lineHeight);
+const xLine = d3.scaleTime()
+.domain(d3.extent(data, d => new Date(d.transaction_date)))
+.range([0, lineWidth]);
+
+const yLine = d3.scaleLinear()
+.domain([0, d3.max(data, d => d.sales_amount)])
+.range([lineHeight, 0]);
+const line = d3.line()
+.x(d => xLine(new Date(d.transaction_date)))
+.y(d => yLine(d.sales_amount));
+
+lineSvg.append("path")
+.datum(data)
+.attr("fill", "none")
+.attr("stroke", "blue")
+.attr("stroke-width", 1.5)
+.attr("d", line);
+// Scatter Plot
+const scatterWidth = 200, scatterHeight = 200;
+const scatterSvg = d3.select("#scatterPlot").append("svg")
+.attr("width", scatterWidth)
+.attr("height", scatterHeight);
+const xScatter = d3.scaleTime()
+.domain(d3.extent(data, d => new Date(d.transaction_date)))
+.range([0, scatterWidth]);
+const yScatter = d3.scaleLinear()
+.domain([0, d3.max(data, d => d.sales_amount)])
+.range([scatterHeight, 0]);
+scatterSvg.selectAll("circle")
+.data(data)
+.enter()
+.append("circle")
+.attr("cx", d => xScatter(new Date(d.transaction_date)))
+.attr("cy", d => yScatter(d.sales_amount))
+.attr("r", 5)
+.attr("fill", "red");
+})
+.catch(error => console.error('Error:', error));
+</script>
+</body>
+</html>

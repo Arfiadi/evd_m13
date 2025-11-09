@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scatter Plot Penjualan dengan D3.js</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+.chart {
+width: 800px;
+height: 500px;
+}
+.axis-label {
+font-size: 12px;
+}
+.tooltip {
+position: absolute;
+background-color: #fff;
+border: 1px solid #ccc;
+padding: 8px;
+font-size: 12px;
+pointer-events: none;
+display: none;
+}
+.legend-text {
+    font-size: 12px;
+    font-family: Arial, sans-serif;
+}
+</style>
+</head>
+<body>
+<h1>Scatter Plot Penjualan</h1>
+<div class="chart" id="scatterPlot"></div>
+<div class="tooltip" id="tooltip"></div>
+<script>
+// Mengambil data dari PHP
+fetch('konekpenjualan.php')
+.then(response => response.json())
+.then(data => {
+// Konversi tanggal menjadi objek Date
+data.forEach(d => {
+d.transaction_date = new Date(d.transaction_date);
+d.sales_amount = +d.sales_amount;
+d.unit_price = +d.unit_price;
+});
+
+// 1. UBAH MARGIN (DIUBAH)
+// (Kita beri margin.right = 100 agar ada ruang untuk legenda)
+const margin = { top: 20, right: 100, bottom: 50, left: 50 }; 
+
+// 2. LEBAR GRAFIK DISESUAIKAN (DIUBAH)
+// (Sekarang menjadi 800 - 50 - 100 = 650px)
+const width = 800 - margin.left - margin.right; 
+const height = 500 - margin.top - margin.bottom;
+
+// Buat Skala Warna
+const productDomain = [...new Set(data.map(d => d.product_name))];
+const color = d3.scaleOrdinal(d3.schemeCategory10)
+    .domain(productDomain);
+
+// Buat SVG Kontainer
+const svgContainer = d3.select("#scatterPlot")
+.append("svg")
+.attr("width", width + margin.left + margin.right) // Lebar total tetap 800
+.attr("height", height + margin.top + margin.bottom);
+
+// Buat Grup SVG Utama
+const svg = svgContainer.append("g")
+.attr("transform", `translate(${margin.left},${margin.top})`);
+
+// Skala (tidak berubah)
+const x = d3.scaleTime()
+.domain(d3.extent(data, d => d.transaction_date))
+.range([0, width]); // Range otomatis pakai width baru (650)
+const y = d3.scaleLinear()
+.domain([0, d3.max(data, d => d.sales_amount)]).nice()
+.range([height, 0]);
+
+// Sumbu X (tidak berubah)
+svg.append("g")
+.attr("transform", `translate(0,${height})`)
+.call(d3.axisBottom(x).ticks(10))
+.append("text")
+.attr("class", "axis-label")
+.attr("x", width / 2) // Posisi otomatis pakai width baru (650)
+.attr("y", 40)
+.attr("fill", "black")
+.text("Tanggal Transaksi");
+
+// Sumbu Y (tidak berubah)
+svg.append("g")
+.call(d3.axisLeft(y))
+.append("text")
+.attr("class", "axis-label")
+.attr("x", -height / 2)
+.attr("y", -40)
+.attr("transform", "rotate(-90)")
+.attr("fill", "black")
+.style("text-anchor", "middle")
+.text("Jumlah Penjualan");
+
+// Tooltip
+const tooltip = d3.select("#tooltip");
+
+// Titik-titik scatter plot (tidak berubah)
+svg.selectAll("circle")
+.data(data)
+.enter()
+.append("circle")
+.attr("cx", d => x(d.transaction_date))
+.attr("cy", d => y(d.sales_amount))
+.attr("r", 5)
+.attr("fill", d => color(d.product_name))
+.style("opacity", 0.7)
+.on("mouseover", (event, d) => {
+tooltip.style("display", "block")
+.html(`
+<strong>Produk:</strong> ${d.product_name}<br>
+<strong>Jumlah:</strong> ${d.sales_amount}<br>
+<strong>Harga per Unit:</strong> ${d.unit_price}<br>
+<strong>Tanggal:</strong> ${d.transaction_date.toDateString()}
+`);
+})
+.on("mousemove", (event) => {
+tooltip.style("left", (event.pageX + 10) + "px")
+.style("top", (event.pageY - 10) + "px");
+})
+.on("mouseout", () => {
+tooltip.style("display", "none");
+});
+
+// 3. POSISI LEGENDA DISESUAIKAN (DIUBAH)
+// (Posisi X sekarang di: 50 (margin.left) + 650 (width) + 10 = 710px)
+const legend = svgContainer.append("g")
+    .attr("transform", `translate(${margin.left + width + 10}, ${margin.top})`);
+
+const legendItems = legend.selectAll(".legend-item")
+    .data(productDomain) 
+    .enter()
+    .append("g")
+    .attr("class", "legend-item")
+    .attr("transform", (d, i) => `translate(0, ${i * 25})`);
+legendItems.append("rect")
+    .attr("width", 15)
+    .attr("height", 15)
+    .attr("fill", d => color(d));
+legendItems.append("text")
+    .attr("class", "legend-text")
+    .attr("x", 20)
+    .attr("y", 12) 
+    .text(d => d);
+
+})
+.catch(error => console.error('Error:', error));
+</script>
+</body>
+</html>

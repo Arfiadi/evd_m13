@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scatter Plot Penjualan dengan D3.js</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+.chart {
+width: 800px;
+height: 500px;
+}
+.axis-label {
+font-size: 12px;
+}
+.tooltip {
+position: absolute;
+background-color: #fff;
+border: 1px solid #ccc;
+padding: 8px;
+font-size: 12px;
+pointer-events: none;
+display: none;
+}
+</style>
+</head>
+<body>
+<h1>Scatter Plot Penjualan</h1>
+<div class="chart" id="scatterPlot"></div>
+<div class="tooltip" id="tooltip"></div>
+<script>
+// Mengambil data dari PHP
+fetch('konekpenjualan.php')
+.then(response => response.json())
+.then(data => {
+// Konversi tanggal menjadi objek Date
+data.forEach(d => {
+d.transaction_date = new Date(d.transaction_date);
+d.sales_amount = +d.sales_amount;
+d.unit_price = +d.unit_price;
+});
+const margin = { top: 20, right: 30, bottom: 50, left: 50 };
+const width = 800 - margin.left - margin.right;
+const height = 500 - margin.top - margin.bottom;
+// Menambahkan SVG untuk scatter plot
+const svg = d3.select("#scatterPlot")
+.append("svg")
+.attr("width", width + margin.left + margin.right)
+.attr("height", height + margin.top + margin.bottom)
+.append("g")
+.attr("transform", `translate(${margin.left},${margin.top})`);
+// Skala untuk sumbu X (Tanggal Transaksi)
+const x = d3.scaleTime()
+.domain(d3.extent(data, d => d.transaction_date))
+.range([0, width]);
+// Skala untuk sumbu Y (Jumlah Penjualan)
+const y = d3.scaleLinear()
+.domain([0, d3.max(data, d => d.sales_amount)])
+.range([height, 0]);
+// Menambahkan sumbu X
+svg.append("g")
+.attr("transform", `translate(0,${height})`)
+.call(d3.axisBottom(x).ticks(10))
+.append("text")
+.attr("class", "axis-label")
+.attr("x", width / 2)
+.attr("y", 40)
+.attr("fill", "black")
+.text("Tanggal Transaksi");
+// Menambahkan sumbu Y
+svg.append("g")
+.call(d3.axisLeft(y))
+.append("text")
+.attr("class", "axis-label")
+.attr("x", -height / 2)
+.attr("y", -40)
+.attr("transform", "rotate(-90)")
+.attr("fill", "black")
+.style("text-anchor", "middle")
+.text("Jumlah Penjualan");
+// Tooltip
+const tooltip = d3.select("#tooltip");
+// Membuat titik-titik scatter plot
+svg.selectAll("circle")
+.data(data)
+.enter()
+.append("circle")
+.attr("cx", d => x(d.transaction_date))
+.attr("cy", d => y(d.sales_amount))
+.attr("r", 5)
+.attr("fill", "steelblue")
+.on("mouseover", (event, d) => {
+tooltip.style("display", "block")
+.html(`
+<strong>Produk:</strong> ${d.product_name}<br>
+<strong>Jumlah:</strong> ${d.sales_amount}<br>
+<strong>Harga per Unit:</strong> ${d.unit_price}<br>
+<strong>Tanggal:</strong> ${d.transaction_date.toDateString()}
+`);
+})
+.on("mousemove", (event) => {
+tooltip.style("left", (event.pageX + 10) + "px")
+.style("top", (event.pageY - 10) + "px");
+})
+.on("mouseout", () => {
+tooltip.style("display", "none");
+});
+})
+.catch(error => console.error('Error:', error));
+</script>
+</body>
+</html>
